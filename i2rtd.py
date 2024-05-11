@@ -13,6 +13,7 @@ from functools import partialmethod, wraps
 from enum import IntEnum
 from collections.abc import Iterable
 from smbus2 import SMBus, i2c_msg
+from pyhexdump import hexdump
 
 R = i2c_msg.read
 W = i2c_msg.write
@@ -78,35 +79,7 @@ def limit_addr(_min, _max):
         return wrapper
     return dec_limit_addr
 
-# todo move to separate lib
-def hexdump(read_func, start, _len=16, end=0):
-    if _len and not end:
-        end = start + _len - 1
-
-    # round start down to 16 byte boundary
-    start -= start % 0x10
-    alen = 4 if end <= 0x10000 else 8
-
-    # read 16 byte per line
-    for yaddr in range(start, end, 0x10):
-        if yaddr & 0xff == 0x00 or yaddr == start:
-            print()
-            print(" " * (alen + 2), end="")
-            print("00 01 02 03  04 05 06 07  08 09 0a 0b  0c 0d 0e 0f")
-            print(" " * (alen + 2), end="")
-            print("-- -- -- --  -- -- -- --  -- -- -- --  -- -- -- --")
-
-        data = [read_func(addr)[0] for addr in range(yaddr, yaddr + 0x10)]
-
-        # cut in chunks of 4 byte each
-        zip_data = zip(*[iter(data)]*4)
-        # format data: ff ff ff ff  ff ff ff ff  ff ff ff ff  ff ff ff ff
-        hex_data = '  '.join((map(lambda x: ' '.join(map("{:02x}".format, x)), zip_data)))
-
-        print(f'{yaddr:0{alen}x}: {hex_data}')
-
 class I2RTD:
-
     def __init__(self, bus):
         self.bus = SMBus(bus)
         self._debug = False
@@ -135,16 +108,16 @@ class I2RTD:
         except OSError:
             pass
 
-    def _dump(self, read_func, start, _len=16, end=0, halt=True):
+    def _dump(self, read_func, addr, _len=16, end=0, halt=True):
         is_debug = read_func.__name__.startswith('debug_')
-        if is_debug and halt:
-            self.debug_halt_mcu(True)
+        addr_type = read_func.__name__.split("_")[-1]
+        addr_len = {'xdata': 2, 'isp': 1, 'eeprom': 4}[addr_type]
 
-        read_func = partial(read_func, halt=False)
-        hexdump(read_func, start, _len, end)
+        if end:
+            _len = end - addr + 1
 
-        if is_debug and halt:
-            self.debug_halt_mcu(False)
+        data = read_func(addr, _len, halt=halt)
+        hexdump(data, start_addr=addr, addr_len=addr_len)
 
     def isp_enable(self, onoff):
         if self._isp == onoff:

@@ -1,1 +1,2 @@
 smbus2
+pyhexdump

@@ -40,7 +40,7 @@ def debug(func, *args, **kwargs):
         if self._debug_auto:
             self.debug_enable(True)
 
-        if not self._debug:
+        if not self.debug_enabled:
             raise(Exception("Error: method requires debug mode"))
 
         ret = func(self, *args, **kwargs)
@@ -55,7 +55,7 @@ def debug(func, *args, **kwargs):
 def isp(func, *args, **kwargs):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        if not self._isp:
+        if not self.isp_enabled:
             raise(Exception("Error: method requires isp mode"))
 
         return func(self, *args, **kwargs)
@@ -82,9 +82,7 @@ def limit_addr(_min, _max):
 class I2RTD:
     def __init__(self, bus):
         self.bus = SMBus(bus)
-        self._debug = False
         self._debug_auto = False
-        self._isp = False
         self._halted = False
 
         # dynamically add dumper functions for each read function
@@ -96,17 +94,11 @@ class I2RTD:
 
         try:
             # ISP should always respond
-            self._isp = self.isp_enabled
+            self.bus.read_byte(ADDR.ISP)
             # ... fail, if not
         except OSError as e:
             raise(Exception("device not reachable"))
             raise(e)
-
-        try:
-            self.bus.read_byte(ADDR.DBG)
-            self._debug = True
-        except OSError:
-            pass
 
     def _dump(self, read_func, addr, _len=16, end=0, halt=True):
         is_debug = read_func.__name__.startswith('debug_')
@@ -120,16 +112,13 @@ class I2RTD:
         hexdump(data, start_addr=addr, addr_len=addr_len)
 
     def isp_enable(self, onoff):
-        if self._isp == onoff:
+        if self.isp_enabled == onoff:
             return
 
         if onoff:
             self.bus.transfer(W(ADDR.ISP, [0x6f, 0x80]))
-            self._debug = False
         else:
             self.bus.transfer(W(ADDR.ISP, [0x6f, 0x00]))
-
-        self._isp = onoff
 
     @property
     def isp_enabled(self):
@@ -161,14 +150,20 @@ class I2RTD:
         self.isp_enable(True)
         # reset mcu and scalar
         self.bus.transfer(W(ADDR.ISP, [0xee, 0x03]))
-        self._isp = False
-        self._debug = False
 
     def debug_enable_auto(self, onoff):
         self._debug_auto = onoff
 
+    @property
+    def debug_enabled(self):
+        try:
+            self.bus.read_byte(ADDR.DBG)
+            return True
+        except OSError:
+            return False
+
     def debug_enable(self, onoff):
-        if self._debug == onoff:
+        if self.debug_enabled == onoff:
             return
 
         time.sleep(0.05)
@@ -182,7 +177,6 @@ class I2RTD:
             #self.bus.transfer(W(ADDR.DBG, [VCP.DEBUGEN, 0x00]))
             self.bus.transfer(W(ADDR.DBG, [0x71, 0x00]))
 
-        self._debug = onoff
         time.sleep(0.05)
 
     @debug

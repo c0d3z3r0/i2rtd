@@ -36,10 +36,18 @@ class ADDR(IntEnum):
 def debug(func, *args, **kwargs):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
+        if self._debug_auto:
+            self.debug_enable(True)
+
         if not self._debug:
             raise(Exception("Error: method requires debug mode"))
 
-        return func(self, *args, **kwargs)
+        ret = func(self, *args, **kwargs)
+
+        if self._debug_auto:
+            self.debug_enable(False)
+
+        return ret
 
     return wrapper
 
@@ -102,6 +110,7 @@ class I2RTD:
     def __init__(self, bus):
         self.bus = SMBus(bus)
         self._debug = False
+        self._debug_auto = False
         self._isp = False
         self._halted = False
 
@@ -181,6 +190,9 @@ class I2RTD:
         self.bus.transfer(W(ADDR.ISP, [0xee, 0x03]))
         self._isp = False
         self._debug = False
+
+    def debug_enable_auto(self, onoff):
+        self._debug_auto = onoff
 
     def debug_enable(self, onoff):
         if self._debug == onoff:

@@ -85,13 +85,6 @@ class I2RTD:
         self._debug_auto = False
         self._halted = False
 
-        # dynamically add dumper functions for each read function
-        self._dumpable = {'isp': ['xfr'], 'debug': ['xdata', 'eeprom']}
-        for i, dd in self._dumpable.items():
-            for d in dd:
-                read_func = getattr(self, f'{i}_read_{d}')
-                setattr(self, f'{i}_dump_{d}', partial(self._dump, read_func))
-
         try:
             # ISP should always respond
             self.bus.read_byte(ADDR.ISP)
@@ -99,17 +92,6 @@ class I2RTD:
         except OSError as e:
             raise(Exception("device not reachable"))
             raise(e)
-
-    def _dump(self, read_func, addr, _len=16, end=0, halt=True):
-        is_debug = read_func.__name__.startswith('debug_')
-        addr_type = read_func.__name__.split("_")[-1]
-        addr_len = {'xdata': 2, 'isp': 1, 'eeprom': 4}[addr_type]
-
-        if end:
-            _len = end - addr + 1
-
-        data = read_func(addr, _len, halt=halt)
-        hexdump(data, start_addr=addr, addr_len=addr_len)
 
     def isp_enable(self, onoff):
         if self.isp_enabled == onoff:
@@ -128,15 +110,21 @@ class I2RTD:
 
     @isp
     @limit_addr(0x00, 0xff)
-    def isp_read_xfr(self, addr, _len=1):
-        data = []
+    def isp_iter_read_xfr(self, addr, _len=1):
         for _addr in range(addr, addr + _len):
             m = R(ADDR.ISP, 1)
             self.bus.transfer(W(ADDR.ISP, [_addr]))
             self.bus.transfer(m)
-            data.append(int.from_bytes(m))
+            yield int.from_bytes(m)
 
-        return data
+    def isp_read_xfr(self, addr, _len=1):
+        return list(self.debug_iter_read_xfr(addr, _len))
+
+    def isp_dump_xfr(self, addr, _len=1, end=0):
+        if end:
+            _len = end - addr + 1
+
+        hexdump(self.debug_iter_read_xfr(addr, _len, halt), start_addr=addr, addr_len=1)
 
     @isp
     @limit_addr(0x00, 0xff)
@@ -182,16 +170,15 @@ class I2RTD:
     @debug
     def debug_halt_mcu(self, halt):
         self.bus.transfer(W(ADDR.DBG, [0x80, int(halt)]))
-        time.sleep(0.1)
         self._halted = halt
+        time.sleep(0.1)
 
     @debug
     @limit_addr(0x0000, 0xffff)
-    def debug_read_xdata(self, addr, _len=1, halt=True):
+    def debug_iter_read_xdata(self, addr, _len=1, end=0, halt=True):
         if halt:
             self.debug_halt_mcu(True)
 
-        data = []
         for _addr in range(addr, addr + _len):
             m = R(ADDR.DBG, 1)
             addrH, addrL = _addr >> 8 & 0xff, _addr & 0xff
@@ -199,12 +186,19 @@ class I2RTD:
             if not self._halted:
                 time.sleep(0.01)
             self.bus.transfer(m)
-            data.append(int.from_bytes(m))
+            yield int.from_bytes(m)
 
         if halt:
             self.debug_halt_mcu(False)
 
-        return data
+    def debug_read_xdata(self, addr, _len=1, halt=True):
+        return list(self.debug_iter_read_xdata(addr, _len, halt))
+
+    def debug_dump_xdata(self, addr, _len=1, end=0, halt=True):
+        if end:
+            _len = end - addr + 1
+
+        hexdump(self.debug_iter_read_xdata(addr, _len, halt), start_addr=addr, addr_len=2)
 
     @debug
     @limit_addr(0x0000, 0xffff)
@@ -224,11 +218,10 @@ class I2RTD:
             self.debug_halt_mcu(False)
 
     @debug
-    def debug_read_eeprom(self, addr, _len=1, i2caddr=0xa0, halt=True):
+    def debug_iter_read_eeprom(self, addr, _len=1, i2caddr=0xa0, halt=True):
         if halt:
             self.debug_halt_mcu(True)
 
-        data = []
         for _addr in range(addr, addr + _len):
             addrH, addrL = _addr >> 8 & 0xff, _addr & 0xff
             m = R(ADDR.DBG, 1)
@@ -237,12 +230,19 @@ class I2RTD:
             if not self._halted:
                 time.sleep(0.01)
             self.bus.transfer(m)
-            data.append(int.from_bytes(m))
+            yield int.from_bytes(m)
 
         if halt:
             self.debug_halt_mcu(False)
 
-        return data
+    def debug_read_eeprom(self, addr, _len=1, halt=True):
+        return list(self.debug_iter_read_eeprom(addr, _len, halt))
+
+    def debug_dump_eeprom(self, addr, _len=1, end=0, halt=True):
+        if end:
+            _len = end - addr + 1
+
+        hexdump(self.debug_iter_read_eeprom(addr, _len, halt), start_addr=addr, addr_len=4)
 
     @debug
     def debug_write_eeprom(self, addr, data, i2caddr=0xa0, halt=True):

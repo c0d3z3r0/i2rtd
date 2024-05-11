@@ -171,6 +171,8 @@ class I2RTD:
         if self._debug == onoff:
             return
 
+        time.sleep(0.05)
+
         if onoff:
             #self.bus.transfer(W(ADDR.DDC, [VCP.DEBUGEN, 0x81, 0xaa, 0xff]))
             self.bus.transfer(W(ADDR.DDC, [0x71, 0x81, 0xaa, 0xff]))
@@ -181,6 +183,7 @@ class I2RTD:
             self.bus.transfer(W(ADDR.DBG, [0x71, 0x00]))
 
         self._debug = onoff
+        time.sleep(0.05)
 
     @debug
     def debug_halt_mcu(self, halt):

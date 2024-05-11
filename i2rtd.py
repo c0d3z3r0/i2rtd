@@ -135,7 +135,7 @@ class I2RTD:
             self.bus.transfer(W(ADDR.ISP, [_addr, val]))
 
     def isp_reset(self):
-        self.isp_enable(True)
+        self.isp_enable(True, force=True)
         # reset mcu and scalar
         self.bus.transfer(W(ADDR.ISP, [0xee, 0x03]))
 

@@ -93,8 +93,8 @@ class I2RTD:
             raise(Exception("device not reachable"))
             raise(e)
 
-    def isp_enable(self, onoff):
-        if self.isp_enabled == onoff:
+    def isp_enable(self, onoff, force=False):
+        if self.isp_enabled == onoff and not force:
             return
 
         if onoff:
@@ -150,8 +150,8 @@ class I2RTD:
         except OSError:
             return False
 
-    def debug_enable(self, onoff):
-        if self.debug_enabled == onoff:
+    def debug_enable(self, onoff, force=False):
+        if self.debug_enabled == onoff and not force:
             return
 
         time.sleep(0.05)

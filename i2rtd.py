@@ -160,6 +160,7 @@ class I2RTD:
 
     @debug
     def debug_halt_mcu(self, halt):
+        time.sleep(0.1)
         self.bus.transfer(W(ADDR.DBG, [0x80, int(halt)]))
         self._halted = halt
         time.sleep(0.1)

@@ -37,18 +37,10 @@ class ADDR(IntEnum):
 def debug(func, *args, **kwargs):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        if self._debug_auto:
-            self.debug_enable(True)
-
         if not self.debug_enabled:
             raise(Exception("Error: method requires debug mode"))
 
-        ret = func(self, *args, **kwargs)
-
-        if self._debug_auto:
-            self.debug_enable(False)
-
-        return ret
+        return func(self, *args, **kwargs)
 
     return wrapper
 
@@ -82,7 +74,6 @@ def limit_addr(_min, _max):
 class I2RTD:
     def __init__(self, bus):
         self.bus = SMBus(bus)
-        self._debug_auto = False
         self._halted = False
 
         try:
@@ -138,9 +129,6 @@ class I2RTD:
         self.isp_enable(True, force=True)
         # reset mcu and scalar
         self.bus.transfer(W(ADDR.ISP, [0xee, 0x03]))
-
-    def debug_enable_auto(self, onoff):
-        self._debug_auto = onoff
 
     @property
     def debug_enabled(self):

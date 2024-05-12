@@ -142,6 +142,9 @@ class I2RTD:
         if self.debug_enabled == onoff and not force:
             return
 
+        if not onoff and self._halted:
+            raise(Exception("Debug must not be disabled when MCU is halted!"))
+
         time.sleep(0.05)
 
         if onoff:

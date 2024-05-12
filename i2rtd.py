@@ -175,7 +175,7 @@ class I2RTD:
             m = R(ADDR.DBG, 1)
             addrH, addrL = _addr >> 8 & 0xff, _addr & 0xff
             self.bus.transfer(W(ADDR.DBG, [0x3a, addrL, addrH]))
-            if not self._halted:
+            if not halt:
                 time.sleep(0.01)
             self.bus.transfer(m)
             yield int.from_bytes(m)
@@ -190,7 +190,7 @@ class I2RTD:
         if end:
             _len = end - addr + 1
 
-        hexdump(self.debug_iter_read_xdata(addr, _len, halt), start_addr=addr, addr_len=2)
+        hexdump(self.debug_iter_read_xdata(addr, _len, halt=halt), start_addr=addr, addr_len=2)
 
     @debug
     @limit_addr(0x0000, 0xffff)
@@ -203,7 +203,7 @@ class I2RTD:
         for _addr, val in enumerate(data, addr):
             addrH, addrL = _addr >> 8 & 0xff, _addr & 0xff
             self.bus.transfer(W(ADDR.DBG, [0x3b, addrL, addrH, val]))
-            if not self._halted:
+            if not halt:
                 time.sleep(0.01)
 
         if halt:
@@ -219,7 +219,7 @@ class I2RTD:
             m = R(ADDR.DBG, 1)
             self.bus.transfer(W(ADDR.DBG, [0x44, addrL, i2caddr, 0x00, addrH]))
             time.sleep(0.01)
-            if not self._halted:
+            if not halt:
                 time.sleep(0.01)
             self.bus.transfer(m)
             yield int.from_bytes(m)
@@ -228,13 +228,13 @@ class I2RTD:
             self.debug_halt_mcu(False)
 
     def debug_read_eeprom(self, addr, _len=1, halt=True):
-        return list(self.debug_iter_read_eeprom(addr, _len, halt))
+        return list(self.debug_iter_read_eeprom(addr, _len, halt=halt))
 
     def debug_dump_eeprom(self, addr, _len=1, end=0, halt=True):
         if end:
             _len = end - addr + 1
 
-        hexdump(self.debug_iter_read_eeprom(addr, _len, halt), start_addr=addr, addr_len=4)
+        hexdump(self.debug_iter_read_eeprom(addr, _len, halt=halt), start_addr=addr, addr_len=4)
 
     @debug
     def debug_write_eeprom(self, addr, data, i2caddr=0xa0, halt=True):
@@ -247,7 +247,7 @@ class I2RTD:
             addrH, addrL = _addr >> 8 & 0xff, _addr & 0xff
             self.bus.transfer(W(ADDR.DBG, [0x04, addrL, i2caddr, val, addrH]))
             time.sleep(0.01)
-            if not self._halted:
+            if not halt:
                 time.sleep(0.01)
 
         if halt:
